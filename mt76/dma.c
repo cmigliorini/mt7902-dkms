@@ -910,12 +910,21 @@ free_frag:
 	return done;
 }
 
+static inline void *mt76_priv(struct net_device *dev)
+{
+	struct mt76_dev **priv;
+
+	priv = netdev_priv(dev);
+
+	return *priv;
+}
+
 int mt7902_mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 {
 	struct mt7902_mt76_dev *dev;
 	int qid, done = 0, cur;
 
-	dev = container_of(napi->dev, struct mt7902_mt76_dev, napi_dev);
+	dev = mt76_priv(napi->dev);
 	qid = napi - dev->napi;
 
 	rcu_read_lock();
@@ -935,23 +944,97 @@ int mt7902_mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 }
 EXPORT_SYMBOL_GPL(mt7902_mt76_dma_rx_poll);
 
+static inline bool mt76_queue_is_wed_rro_rxdmad_c(struct mt7902_mt76_queue *q)
+{
+	return mt7902_mt76_queue_is_wed_rro(q) &&
+	       FIELD_GET(MT_QFLAG_WED_TYPE, q->flags) == MT76_WED_RRO_Q_RXDMAD_C;
+}
+
+static int
+mt76_dma_rx_fill_buf(struct mt7902_mt76_dev *dev, struct mt7902_mt76_queue *q,
+		     bool allow_direct)
+{
+	int len = SKB_WITH_OVERHEAD(q->buf_size);
+	int frames = 0;
+
+	if (!q->ndesc)
+		return 0;
+
+	while (q->queued < q->ndesc - 1) {
+		struct mt7902_mt76_queue_buf qbuf = {};
+		void *buf = NULL;
+		int offset;
+
+		if (mt7902_mt76_queue_is_wed_rro_ind(q) ||
+		    mt76_queue_is_wed_rro_rxdmad_c(q))
+			goto done;
+
+		buf = mt7902_mt76_get_page_pool_buf(q, &offset, q->buf_size);
+		if (!buf)
+			break;
+
+		qbuf.addr = page_pool_get_dma_addr(virt_to_head_page(buf)) +
+			    offset + q->buf_offset;
+done:
+		qbuf.len = len - q->buf_offset;
+		qbuf.skip_unmap = false;
+		if (mt7902_mt76_dma_add_rx_buf(dev, q, &qbuf, buf) < 0) {
+			mt7902_mt76_put_page_pool_buf(buf, allow_direct);
+			break;
+		}
+		frames++;
+	}
+
+	if (frames || mt7902_mt76_queue_is_wed_rx(q))
+		mt7902_mt76_dma_kick_queue(dev, q);
+
+	return frames;
+}
+
+
+static void
+mt76_dma_rx_queue_init(struct mt7902_mt76_dev *dev, enum mt7902_mt76_rxq_id qid,
+		       int (*poll)(struct napi_struct *napi, int budget))
+{
+	netif_napi_add(dev->napi_dev, &dev->napi[qid], poll);
+	mt76_dma_rx_fill_buf(dev, &dev->q_rx[qid], false);
+	napi_enable(&dev->napi[qid]);
+}
+
 static int
 mt7902_mt76_dma_init(struct mt7902_mt76_dev *dev,
 	      int (*poll)(struct napi_struct *napi, int budget))
 {
+    struct mt7902_mt76_dev **priv;
 	int i;
 
-	init_dummy_netdev(&dev->napi_dev);
-	init_dummy_netdev(&dev->tx_napi_dev);
-	snprintf(dev->napi_dev.name, sizeof(dev->napi_dev.name), "%s",
+	dev->napi_dev = alloc_netdev_dummy(sizeof(struct mt76_dev *));
+	if (!dev->napi_dev)
+		return -ENOMEM;
+
+	/* napi_dev private data points to mt76_dev parent, so, mt76_dev
+	 * can be retrieved given napi_dev
+	 */
+	priv = netdev_priv(dev->napi_dev);
+	*priv = dev;
+
+	dev->tx_napi_dev = alloc_netdev_dummy(sizeof(struct mt76_dev *));
+	if (!dev->tx_napi_dev) {
+		free_netdev(dev->napi_dev);
+		return -ENOMEM;
+	}
+	priv = netdev_priv(dev->tx_napi_dev);
+	*priv = dev;
+
+	snprintf(dev->napi_dev->name, sizeof(dev->napi_dev->name), "%s",
 		 wiphy_name(dev->hw->wiphy));
-	dev->napi_dev.threaded = 1;
+	dev->napi_dev->threaded = 1;
 	init_completion(&dev->mmio.wed_reset);
 	init_completion(&dev->mmio.wed_reset_complete);
 
 	mt7902_mt76_for_each_q_rx(dev, i) {
-		netif_napi_add(&dev->napi_dev, &dev->napi[i], poll);
-		mt7902_mt76_dma_rx_fill(dev, &dev->q_rx[i], false);
+		netif_napi_add(dev->napi_dev, &dev->napi[i], poll);
+		mt76_dma_rx_fill_buf(dev, &dev->q_rx[i], false);
 		napi_enable(&dev->napi[i]);
 	}
 

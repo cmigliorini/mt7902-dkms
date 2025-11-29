@@ -411,7 +411,7 @@ static int mt7902_abort_roc(struct mt7902_mt792x_phy *phy, struct mt7902_mt792x_
 {
 	int err = 0;
 
-	del_timer_sync(&phy->roc_timer);
+	timer_delete_sync(&phy->roc_timer);
 	cancel_work_sync(&phy->roc_work);
 
 	mt7902_mt792x_mutex_acquire(phy->dev);
@@ -613,7 +613,7 @@ void mt7902_set_runtime_pm(struct mt7902_mt792x_dev *dev)
 	mt7902_mcu_set_deep_sleep(dev, pm->ds_enable);
 }
 
-static int mt7902_config(struct ieee80211_hw *hw, u32 changed)
+static int mt7902_config(struct ieee80211_hw *hw, int rad_idx,u32 changed)
 {
 	struct mt7902_mt792x_dev *dev = mt7902_mt792x_hw_dev(hw);
 	int ret = 0;
@@ -857,7 +857,7 @@ void mt7902_mac_sta_remove(struct mt7902_mt76_dev *mdev, struct ieee80211_vif *v
 }
 EXPORT_SYMBOL_GPL(mt7902_mac_sta_remove);
 
-static int mt7902_set_rts_threshold(struct ieee80211_hw *hw, u32 val)
+static int mt7902_set_rts_threshold(struct ieee80211_hw *hw, int rad_idx,u32 val)
 {
 	struct mt7902_mt792x_dev *dev = mt7902_mt792x_hw_dev(hw);
 
@@ -1065,7 +1065,8 @@ mt7902_stop_sched_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 }
 
 static int
-mt7902_set_antenna(struct ieee80211_hw *hw, u32 tx_ant, u32 rx_ant)
+mt7902_set_antenna(struct ieee80211_hw *hw, int radio_idx,
+		   u32 tx_ant, u32 rx_ant)
 {
 	struct mt7902_mt792x_dev *dev = mt7902_mt792x_hw_dev(hw);
 	struct mt7902_mt792x_phy *phy = mt7902_mt792x_hw_phy(hw);

@@ -335,12 +335,21 @@ int mt7902_mt792x_poll_tx(struct napi_struct *napi, int budget)
 }
 EXPORT_SYMBOL_GPL(mt7902_mt792x_poll_tx);
 
+static inline void *mt76_priv(struct net_device *dev)
+{
+	struct mt76_dev **priv;
+
+	priv = netdev_priv(dev);
+
+	return *priv;
+}
+
 int mt7902_mt792x_poll_rx(struct napi_struct *napi, int budget)
 {
-	struct mt7902_mt792x_dev *dev;
+    struct mt7902_mt792x_dev *dev;
 	int done;
 
-	dev = container_of(napi->dev, struct mt7902_mt792x_dev, mt76.napi_dev);
+	dev = mt76_priv(napi->dev);
 
 	if (!mt7902_mt76_connac_pm_ref(&dev->mphy, &dev->pm)) {
 		napi_complete(napi);

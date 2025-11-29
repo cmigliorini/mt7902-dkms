@@ -1,20 +1,7 @@
 #include <linux/module.h>
-#define INCLUDE_VERMAGIC
-#include <linux/build-salt.h>
-#include <linux/elfnote-lto.h>
 #include <linux/export-internal.h>
-#include <linux/vermagic.h>
 #include <linux/compiler.h>
 
-#ifdef CONFIG_UNWINDER_ORC
-#include <asm/orc_header.h>
-ORC_HEADER;
-#endif
-
-BUILD_SALT;
-BUILD_LTO_INFO;
-
-MODULE_INFO(vermagic, VERMAGIC_STRING);
 MODULE_INFO(name, KBUILD_MODNAME);
 
 __visible struct module __this_module
@@ -22,10 +9,6 @@ __section(".gnu.linkonce.this_module") = {
 	.name = KBUILD_MODNAME,
 	.arch = MODULE_ARCH_INIT,
 };
-
-#ifdef CONFIG_RETPOLINE
-MODULE_INFO(retpoline, "Y");
-#endif
 
 KSYMTAB_FUNC(mt7902_mac_write_txwi, "_gpl", "");
 KSYMTAB_FUNC(mt7902_txwi_free, "_gpl", "");
@@ -296,5 +279,4 @@ KSYMTAB_FUNC(mt7902_mt76_mmio_init, "_gpl", "");
 
 MODULE_INFO(depends, "mac80211,cfg80211,mt76");
 
-
-MODULE_INFO(srcversion, "C966A8F80BFD33D2FD27440");
+MODULE_INFO(rhelversion, "10.99");

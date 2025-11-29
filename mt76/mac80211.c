@@ -1554,7 +1554,7 @@ void mt7902_mt76_wcid_cleanup(struct mt7902_mt76_dev *dev, struct mt7902_mt76_wc
 EXPORT_SYMBOL_GPL(mt7902_mt76_wcid_cleanup);
 
 int mt7902_mt76_get_txpower(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-		     int *dbm)
+		     unsigned int link_id, int *dbm)
 {
 	struct mt7902_mt76_phy *phy = hw->priv;
 	int n_chains = hweight16(phy->chainmask);
@@ -1738,14 +1738,19 @@ void mt7902_mt76_sw_scan_complete(struct ieee80211_hw *hw, struct ieee80211_vif 
 }
 EXPORT_SYMBOL_GPL(mt7902_mt76_sw_scan_complete);
 
-int mt7902_mt76_get_antenna(struct ieee80211_hw *hw, u32 *tx_ant, u32 *rx_ant)
+int mt7902_mt76_get_antenna(struct ieee80211_hw *hw, int radio_idx, u32 *tx_ant,
+		     u32 *rx_ant)
 {
 	struct mt7902_mt76_phy *phy = hw->priv;
 	struct mt7902_mt76_dev *dev = phy->dev;
+    int i;
 
 	mutex_lock(&dev->mutex);
-	*tx_ant = phy->antenna_mask;
-	*rx_ant = phy->antenna_mask;
+	*tx_ant = 0;
+	for (i = 0; i < ARRAY_SIZE(dev->phys); i++)
+		if (dev->phys[i] && dev->phys[i]->hw == hw)
+			*tx_ant |= dev->phys[i]->chainmask;
+	*rx_ant = *tx_ant;
 	mutex_unlock(&dev->mutex);
 
 	return 0;

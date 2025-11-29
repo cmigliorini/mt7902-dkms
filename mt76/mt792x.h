@@ -302,7 +302,8 @@ void mt7902_mt792x_sta_statistics(struct ieee80211_hw *hw,
 			   struct ieee80211_vif *vif,
 			   struct ieee80211_sta *sta,
 			   struct station_info *sinfo);
-void mt7902_mt792x_set_coverage_class(struct ieee80211_hw *hw, s16 coverage_class);
+void mt7902_mt792x_set_coverage_class(struct ieee80211_hw *hw, int radio_idx,
+			       s16 coverage_class);
 void mt7902_mt792x_dma_cleanup(struct mt7902_mt792x_dev *dev);
 int mt7902_mt792x_dma_enable(struct mt7902_mt792x_dev *dev);
 int mt7902_mt792x_wpdma_reset(struct mt7902_mt792x_dev *dev, bool force);
